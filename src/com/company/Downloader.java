@@ -1,8 +1,5 @@
 package com.company;
 
-import com.sun.jndi.toolkit.url.Uri;
-import sun.misc.IOUtils;
-
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
@@ -14,7 +11,6 @@ public class Downloader {
     String titleForApi;
     String responseContent;
     Book book;
-    URL bookAdress;
 
     public void setTitleFromUI(String titleFromUI) {
         this.titleFromUI = titleFromUI;
@@ -22,12 +18,17 @@ public class Downloader {
 
     public void downloadBook(){
         titleForApi = cutTitle();
-        if (apiRequest()){
-            book = new Book();
-            book.createBookFromJSON(responseContent);
-            bookAdress = book.getTxt();
+        try {
+            URL infoUrl = new URL("https://wolnelektury.pl/api/books/"+titleForApi);
+            if (apiRequest(infoUrl, false)){
+                System.out.println("Znaleziono książkę, trwa pobieranie.");
+                book = new Book();
+                book.createBookFromJSON(responseContent);
+                if(apiRequest(book.getTxt(),true))System.out.println("Pobieranie zakończone sukcesem.");
 
-            downloadAndSaveTXT();
+             }
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
         }
 
     }
@@ -37,20 +38,20 @@ public class Downloader {
         return titleFromUI.replace(" ","-").toLowerCase();
     }
 
-    private boolean apiRequest(){
+    private boolean apiRequest(URL url, boolean bookText){
         try {
-            URL url = new URL("https://wolnelektury.pl/api/books/"+titleForApi);
+
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             int status = connection.getResponseCode();
-            if(status == 200) System.out.println("Znaleziono książkę, trwa pobieranie");
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(connection.getInputStream()));
             String inputLine;
             responseContent = String.valueOf(new StringBuffer());
             while ((inputLine = in.readLine()) != null) {
-                responseContent = responseContent + inputLine;
+                responseContent = responseContent + inputLine+" \n ";
             }
+            if(bookText)saveBook(responseContent);
             in.close();
             connection.disconnect();
             return true;
@@ -62,29 +63,6 @@ public class Downloader {
 
         }
 
-    }
-
-    private void downloadAndSaveTXT()
-    {
-        try {
-            HttpURLConnection connection = (HttpURLConnection) bookAdress.openConnection();
-            connection.setRequestMethod("GET");
-            int status = connection.getResponseCode();
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            responseContent = String.valueOf(new StringBuffer());
-            while ((inputLine = in.readLine()) != null) {
-                responseContent = responseContent + inputLine +" \n ";
-            }
-
-            System.out.println(responseContent);
-
-            in.close();
-            connection.disconnect();
-            saveBook(responseContent);
-        }catch (IOException e)
-        {}
     }
 
     private void saveBook(String bookText)
